@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:cxf="http://camel.apache.org/schema/cxf"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="        http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd         http://camel.apache.org/schema/cxf http://camel.apache.org/schema/cxf/camel-cxf.xsd         http://camel.apache.org/schema/spring http://camel.apache.org/schema/spring/camel-spring.xsd">
+    <bean class="org.example.dsl.RequestProcessor" id="reqProcessor"/>
+    <bean class="java.net.SocketTimeoutException" id="javaSocketException"/>
+    <cxf:cxfEndpoint
+        address="http://www.holidaywebservice.com/HolidayService_v2/HolidayService2.asmx"
+        endpointName="s:HolidayService2Soap12" id="serviceEndpoint"
+        serviceName="s:HolidayService2" wsdlURL="HolidayService2.wsdl" xmlns:s="http://www.holidaywebservice.com/HolidayService_v2/"/>
+    <camelContext id="camel" streamCache="true" xmlns="http://camel.apache.org/schema/spring">
+        <dataFormats>
+            <json id="json" library="Jackson"/>
+        </dataFormats>
+        <onException>
+            <exception>java.net.SocketTimeoutException</exception>
+            <handled>
+                <constant>true</constant>
+            </handled>
+            <transform>
+                <simple>Error reported: ${exception.message} - cannot process this message.</simple>
+            </transform>
+        </onException>
+        <!-- <restConfiguration bindingMode="auto" component="restlet" contextPath="/api" 
+			port="8081" scheme="http"/> <rest id="rest-5414cfae-47c7-4421-976a-c56c66e1b28f"> 
+			START OF REST CONFIG SR Creation Endpoint <post consumes="application/xml" 
+			id="post-618eecb7-bce2-495e-8808-3ff323e18d16" produces="application/json" 
+			uri="/v1/srcreation"> <to uri="direct:srCreation"/> </post> Job Creation 
+			Endpoint <post consumes="application/xml" id="post-dd551edb-594b-4aba-8fc8-c16b14cd0a21" 
+			uri="/v1/jobcreation"> <to uri="direct:jobCreation"/> </post> </rest> -->
+        <restConfiguration bindingMode="json" component="restlet"
+            contextPath="/api" port="8086" scheme="http">
+            <dataFormatProperty key="prettyPrint" value="true"/>
+            <dataFormatProperty key="json.in.disableFeatures" value="FAIL_ON_EMPTY_BEANS"/>
+        </restConfiguration>
+        <rest>
+            <post bindingMode="json" consumes="application/json" uri="/wsdl/example">
+                <to uri="direct:dummyService"/>
+            </post>
+        </rest>
+        <route id="RT1">
+            <from id="_from1" uri="direct:dummyService"/>
+            <log id="_log1" message="Request Received From User_${body}"/>
+            <marshal id="_unmarshal1" ref="json"/>
+            <setHeader headerName="cellularPhone" id="_setHeader1">
+                <jsonpath>$.cellularPhone</jsonpath>
+            </setHeader>
+            <setHeader headerName="firstName" id="_setHeader2">
+                <jsonpath>$.firstName</jsonpath>
+            </setHeader>
+            <setHeader headerName="lastName" id="_setHeader3">
+                <jsonpath>$.lastName</jsonpath>
+            </setHeader>
+            <setHeader headerName="personUId" id="_setHeader4">
+                <jsonpath>$.personUId</jsonpath>
+            </setHeader>
+            <setBody id="_setBody1">
+                <simple>&lt;soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope" xmlns:hol="http://www.holidaywebservice.com/HolidayService_v2/"&gt;
+   &lt;soap:Header/&gt;
+   &lt;soap:Body&gt;
+      &lt;hol:GetHolidaysForYear&gt;
+         &lt;hol:countryCode&gt;Canada&lt;/hol:countryCode&gt;
+         &lt;hol:year&gt;2019&lt;/hol:year&gt;
+      &lt;/hol:GetHolidaysForYear&gt;
+   &lt;/soap:Body&gt;
+&lt;/soap:Envelope&gt;</simple>
+            </setBody>
+            <log id="_log2" message="Request Sent to Siebel______ ${body}"/>
+            <to id="_to2" uri="log:before?showHeaders=true"/>
+            <to id="_to1" uri="cxf:bean:serviceEndpoint?dataFormat=MESSAGE"/>
+            <setHeader headerName="holidays" id="_setHeader5">
+                <xpath resultType="java.lang.String">/GetHolidaysForMonthResponse/GetHolidaysForMonthResult/Holiday/Country</xpath>
+            </setHeader>
+            <log id="_log4" message="Header is___________________${header.holidays}"/>
+            <log id="_log3" message="Response Body Received at Siebel______ ${body}"/>
+        </route>
+    </camelContext>
+</beans>
